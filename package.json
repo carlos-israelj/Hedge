@@ -1,0 +1,42 @@
+{
+  "name": "hedge",
+  "version": "1.0.0",
+  "description": "Automated currency protection using Stellar and Reflector oracles",
+  "keywords": [
+    "stellar",
+    "soroban",
+    "reflector",
+    "defi",
+    "currency-protection",
+    "latam"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/hedge"
+  },
+  "scripts": {
+    "setup": "./scripts/setup.sh",
+    "test": "./scripts/test.sh",
+    "deploy:testnet": "./scripts/deploy-testnet.sh",
+    "contract:build": "cd contracts/hedge && soroban contract build",
+    "contract:test": "cd contracts/hedge && cargo test",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "dev": "concurrently \"npm run frontend:dev\"",
+    "build": "npm run contract:build && npm run frontend:build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "workspaces": [
+    "frontend"
+  ],
+  "dependencies": {
+    "@stellar/stellar-sdk": "^14.1.1"
+  }
+}
