@@ -3,8 +3,11 @@
 Automated currency protection for LATAM using Stellar and Reflector oracles.
 
 <p align="center">
-  <img src="https://via.placeholder.com/600x300/3b82f6/ffffff?text=Hedge+-+Currency+Protection" alt="Hedge - Automated Currency Protection" />
+  <img width="1024" height="1024" alt="Gemini_Generated_Image_vwlvhcvwlvhcvwlv" src="https://github.com/user-attachments/assets/d554fb82-bf78-4329-b909-7cbef543b79e" />
 </p>
+
+
+
 
 ## Overview
 
