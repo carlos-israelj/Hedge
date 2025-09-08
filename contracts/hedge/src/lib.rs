@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Env, Address, Symbol, String};
+use soroban_sdk::{contract, contractimpl, Env, Address, Symbol, String, Vec, vec};
 
 mod reflector;
 mod types;
@@ -8,6 +8,23 @@ mod storage;
 use crate::reflector::{ReflectorClient, Asset as ReflectorAsset};
 use crate::types::*;
 use crate::storage::*;
+
+const FOREX_ORACLE_ADDRESS: &str = "CAVLP5DH2GJPZMVO7IJY4CVOD5MWEFTJFVPD2YY2FQXOQHRGHK4D6HLP";
+
+// Direcciones de contratos de tokens LATAM en testnet
+const ARS_TOKEN_ADDRESS: &str = "CCRPYMVKZLWGZHEDZ23FOE22E3T3HOCNP5Y2EFZFVRUVIXU5NJ7UNGV2";
+// Solo ARS está disponible en testnet actualmente
+
+// Mapeo de monedas a sus direcciones de contrato (testnet)
+fn get_token_address(env: &Env, currency: &Symbol) -> Option<Address> {
+    let ars = Symbol::new(env, "ARS");
+    
+    if currency == &ars {
+        Some(Address::from_string(&String::from_str(env, ARS_TOKEN_ADDRESS)))
+    } else {
+        None // Solo ARS disponible en testnet
+    }
+}
 
 #[contract]
 pub struct HedgeContract;
@@ -21,7 +38,7 @@ impl HedgeContract {
         user: Address,
         local_currency: Symbol,
         target_percentage: u32,
-        threshold_bp: i128, // basis points (e.g., 200 = 2%)
+        threshold_bp: i128,
     ) -> Result<bool, HedgeError> {
         user.require_auth();
         
@@ -31,6 +48,11 @@ impl HedgeContract {
         
         if threshold_bp < 50 || threshold_bp > 1000 {
             return Err(HedgeError::InvalidThreshold);
+        }
+
+        // Verificar que la moneda sea soportada
+        if get_token_address(&env, &local_currency).is_none() {
+            return Err(HedgeError::InvalidCurrency);
         }
         
         let config = UserConfig {
@@ -84,8 +106,16 @@ impl HedgeContract {
     pub fn get_config(env: Env, user: Address) -> Result<UserConfig, HedgeError> {
         get_user_config(&env, &user)
     }
+
+    /// Get supported currencies
+    pub fn get_supported_currencies(env: Env) -> Result<Vec<Symbol>, HedgeError> {
+        let mut currencies = vec![&env];
+        currencies.push_back(Symbol::new(&env, "ARS"));
+        // Solo ARS disponible en testnet actualmente
+        Ok(currencies)
+    }
     
-    /// Get protection metrics
+    /// Get protection metrics (production version with oracle)
     pub fn get_metrics(
         env: Env, 
         user: Address,
@@ -93,13 +123,16 @@ impl HedgeContract {
     ) -> Result<ProtectionMetrics, HedgeError> {
         let config = get_user_config(&env, &user)?;
         
-        // Get forex oracle
         let fx_oracle = Address::from_string(&String::from_str(&env, FOREX_ORACLE_ADDRESS));
         let reflector = ReflectorClient::new(&env, &fx_oracle);
         
-        let asset = ReflectorAsset::Other(config.local_currency);
+        // Convertir moneda local a dirección de contrato
+        let token_address = get_token_address(&env, &config.local_currency)
+            .ok_or(HedgeError::InvalidCurrency)?;
+        let asset = ReflectorAsset::Stellar(token_address);
+        
         let now = env.ledger().timestamp();
-        let past = now - (days_back as u64 * 86400); // days to seconds
+        let past = now - (days_back as u64 * 86400);
         
         let current_price = reflector.lastprice(&asset)
             .ok_or(HedgeError::NoPrice)?;
@@ -107,7 +140,6 @@ impl HedgeContract {
         let past_price = reflector.price(&asset, &past)
             .ok_or(HedgeError::NoPrice)?;
         
-        // Calculate devaluation
         let devaluation = if past_price.price > current_price.price {
             ((past_price.price - current_price.price) * 10000) / past_price.price
         } else {
@@ -121,23 +153,50 @@ impl HedgeContract {
             current_rate: current_price.price,
         })
     }
+
+    /// Get protection metrics (mock version for testing without oracle)
+    pub fn get_metrics_mock(
+        env: Env, 
+        user: Address,
+        days_back: u32,
+    ) -> Result<ProtectionMetrics, HedgeError> {
+        let config = get_user_config(&env, &user)?;
+        
+        // Simular datos realistas para ARS
+        let simulated_devaluation = match days_back {
+            1 => 25,    // 0.25% en 1 día
+            7 => 180,   // 1.8% en 1 semana
+            30 => 520,  // 5.2% en 1 mes
+            _ => (days_back as i128) * 25, // ~0.25% por día
+        };
+        
+        let simulated_rate = 1000000; // Simular 0.001 USD por ARS (con decimals del oracle)
+        
+        Ok(ProtectionMetrics {
+            total_protected: config.total_protected,
+            currency_devaluation_bp: simulated_devaluation,
+            days_tracked: days_back,
+            current_rate: simulated_rate,
+        })
+    }
     
     /// Check if conversion should be triggered
     fn check_conversion_trigger(env: &Env, config: &UserConfig) -> Result<bool, HedgeError> {
-        // Don't convert more than once per week
         if env.ledger().timestamp() < config.last_conversion + 604800 {
             return Ok(false);
         }
         
         let fx_oracle = Address::from_string(&String::from_str(env, FOREX_ORACLE_ADDRESS));
         let reflector = ReflectorClient::new(env, &fx_oracle);
-        let asset = ReflectorAsset::Other(config.local_currency.clone());
+        
+        let token_address = get_token_address(env, &config.local_currency)
+            .ok_or(HedgeError::InvalidCurrency)?;
+        let asset = ReflectorAsset::Stellar(token_address);
         
         let current = reflector.lastprice(&asset).ok_or(HedgeError::NoPrice)?;
         let week_ago = reflector.price(&asset, &(env.ledger().timestamp() - 604800))
             .ok_or(HedgeError::NoPrice)?;
         
-        // Calculate weekly devaluation in basis points
         let weekly_devaluation = if week_ago.price > current.price {
             ((week_ago.price - current.price) * 10000) / week_ago.price
         } else {
@@ -153,18 +212,18 @@ impl HedgeContract {
         config: &mut UserConfig,
         amount: i128,
     ) -> Result<(), HedgeError> {
-        // Get current rate
         let fx_oracle = Address::from_string(&String::from_str(env, FOREX_ORACLE_ADDRESS));
         let reflector = ReflectorClient::new(env, &fx_oracle);
-        let asset = ReflectorAsset::Other(config.local_currency.clone());
+        
+        let token_address = get_token_address(env, &config.local_currency)
+            .ok_or(HedgeError::InvalidCurrency)?;
+        let asset = ReflectorAsset::Stellar(token_address);
         
         let price_data = reflector.lastprice(&asset).ok_or(HedgeError::NoPrice)?;
         let decimals = reflector.decimals();
         
-        // Calculate USD equivalent
         let usd_amount = (amount * 10i128.pow(decimals)) / price_data.price;
         
-        // Record conversion event
         let event = ConversionEvent {
             timestamp: env.ledger().timestamp(),
             local_amount: amount,
@@ -174,13 +233,9 @@ impl HedgeContract {
         
         add_conversion_event(env, &config.user, &event);
         
-        // Update config
         config.total_protected += usd_amount;
         config.last_conversion = env.ledger().timestamp();
         
         Ok(())
     }
 }
-
-// Contract constants
-const FOREX_ORACLE_ADDRESS: &str = "CBKGPWGKSKZF52CFHMTRR23TBWTPMRDIYZ4O2P5VS65BMHYH4DXMCJZC";

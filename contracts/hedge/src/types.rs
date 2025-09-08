@@ -43,12 +43,13 @@ pub struct ProtectionMetrics {
     pub current_rate: i128,         // current exchange rate
 }
 
-// Supported LATAM currencies
-pub const SUPPORTED_CURRENCIES: &[&str] = &["MXN", "COP", "BRL", "ARS", "CLP", "PEN"];
+// Por:
+pub const SUPPORTED_CURRENCIES: &[&str] = &["ARS", "BRL", "PEN"];
 
 // Oracle addresses for different networks
-pub const TESTNET_FOREX_ORACLE: &str = "CCSSOHTBL3LEWUCBBEB5NJFC2OKFRC74OWEIJIZLRJBGAAU4VMU5NV4W";
-pub const MAINNET_FOREX_ORACLE: &str = "CBKGPWGKSKZF52CFHMTRR23TBWTPMRDIYZ4O2P5VS65BMHYH4DXMCJZC";
+// Cambiar las direcciones a mainnet:
+pub const MAINNET_FOREX_ORACLE: &str = "CALI2BYU2JE6WVRUFYTS6MSBNEHGJ35P4AVCZYF3B6QOE3QKOB2PLE6M";
+pub const TESTNET_FOREX_ORACLE: &str = "CCSSOHTBL3LEWUCBBEB5NJFC2OKFRC74OWEIJIZLRJBGAAU4VMU5N4W";
 
 // Time constants
 pub const SECONDS_PER_WEEK: u64 = 604800;
