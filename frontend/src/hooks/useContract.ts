@@ -37,7 +37,7 @@ export const useContract = () => {
       const contract = new StellarSDK.Contract(CONTRACT_ID);
       const operation = contract.call(
         'setup_protection',
-        StellarSDK.Address.fromString(userAddress),
+        StellarSDK.Address.fromString(userAddress).toScVal(),
         StellarSDK.nativeToScVal(currency, { type: 'symbol' }),
         StellarSDK.nativeToScVal(percentage, { type: 'u32' }),
         StellarSDK.nativeToScVal(thresholdBp, { type: 'i128' })
@@ -66,7 +66,7 @@ export const useContract = () => {
       
       const operation = contract.call(
         'get_config',
-        StellarSDK.Address.fromString(userAddress)
+        StellarSDK.Address.fromString(userAddress).toScVal()
       );
 
       // Mock response para desarrollo
@@ -101,7 +101,7 @@ export const useContract = () => {
       
       const operation = contract.call(
         methodName,
-        StellarSDK.Address.fromString(userAddress),
+        StellarSDK.Address.fromString(userAddress).toScVal(),
         StellarSDK.nativeToScVal(daysBack, { type: 'u32' })
       );
 

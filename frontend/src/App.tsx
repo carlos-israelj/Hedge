@@ -65,7 +65,7 @@ function App() {
     try {
       const alicePublicKey = ALICE_PUBLIC;
       
-      if (!alicePublicKey || alicePublicKey === 'YOUR_ALICE_PUBLIC_KEY_HERE') {
+      if (!alicePublicKey) {
         throw new Error('Alice public key not configured. Run: stellar keys address alice');
       }
       
